@@ -17,4 +17,6 @@ weekly_pattern = (df.groupby(["exercise", "week_num"])
                     .reset_index()
                     .sort_values(["exercise", "week_num"]))
 
+weekly_pattern.to_csv("weekly_programming_patterns.csv", index=False)
 print(weekly_pattern.to_string(index=False))
+
