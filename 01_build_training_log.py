@@ -110,7 +110,7 @@ deadlift_df["pre_block_max_kg"] = 160  # estimated from an untested 140kg x5, no
 
 # --- Combine ---
 cols = ["date", "exercise", "set_id", "reps", "weight_kg", "session_type", "pre_block_max_kg"]
-df = pd.concat([squat_df[cols], bench_df[cols], tbar_df[cols], deadlift_df[cols]], ignore_index=True)
+df = pd.concat([squat_df[cols], bench_df[cols], deadlift_df[cols]], ignore_index=True)
 
 # --- Week/day classification, per lift, relative to that lift's own block start ---
 df["block_start"] = df.groupby("exercise")["date"].transform("min")
