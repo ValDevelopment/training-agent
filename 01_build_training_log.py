@@ -1,7 +1,11 @@
 import pandas as pd
 
+def lbs_to_kg_rounded(lbs, increment=2.5):
+    exact_kg = lbs * 0.453592
+    return round(exact_kg / increment) * increment
+
+# --- Squat (logged natively in kg) ---
 squat_log = [
-    # (date, reps, weight_kg)
     ("2026-04-19", 5, 107), ("2026-04-19", 5, 107), ("2026-04-19", 3, 113), ("2026-04-19", 3, 113),
     ("2026-04-23", 5, 107), ("2026-04-23", 5, 107), ("2026-04-23", 5, 107), ("2026-04-23", 3, 113), ("2026-04-23", 3, 113), ("2026-04-23", 3, 113),
     ("2026-04-26", 5, 113), ("2026-04-26", 5, 113), ("2026-04-26", 3, 118), ("2026-04-26", 3, 118),
@@ -19,22 +23,102 @@ squat_log = [
     ("2026-06-11", 10, 20), ("2026-06-11", 6, 70), ("2026-06-11", 3, 100), ("2026-06-11", 1, 120), ("2026-06-11", 1, 140), ("2026-06-11", 1, 155), ("2026-06-11", 1, 163), ("2026-06-11", 3, 155),
 ]
 
-def classify_session(date):
+def classify_squat_session(date):
     if date == pd.Timestamp("2026-06-11"):
         return "test"
     elif date in [pd.Timestamp("2026-06-04"), pd.Timestamp("2026-06-08")]:
         return "deload"
-    else:
-        return "training"
+    return "training"
 
-df = pd.DataFrame(squat_log, columns=["date", "reps", "weight_kg"])
-df["date"] = pd.to_datetime(df["date"])
-df["exercise"] = "squat"
-df["set_id"] = df.groupby("date").cumcount() + 1
-df["session_type"] = df["date"].apply(classify_session)
-df["training_max_kg"] = 155
+squat_df = pd.DataFrame(squat_log, columns=["date", "reps", "weight_kg"])
+squat_df["date"] = pd.to_datetime(squat_df["date"])
+squat_df["exercise"] = "squat"
+squat_df["set_id"] = squat_df.groupby("date").cumcount() + 1
+squat_df["session_type"] = squat_df["date"].apply(classify_squat_session)
+squat_df["pre_block_max_kg"] = 155
 
-df = df[["date", "exercise", "set_id", "reps", "weight_kg", "session_type", "training_max_kg"]]
+# --- Bench (logged in lbs) ---
+bench_log_lbs = [
+    ("2026-06-03", 6, 225), ("2026-06-03", 5, 225), ("2026-06-03", 4, 225),
+    ("2026-06-06", 6, 230), ("2026-06-06", 4, 230), ("2026-06-06", 4, 225),
+    ("2026-06-10", 4, 240), ("2026-06-10", 4, 235), ("2026-06-10", 5, 225),
+    ("2026-06-13", 7, 225), ("2026-06-13", 5, 225), ("2026-06-13", 4, 225),
+    ("2026-06-20", 4, 243), ("2026-06-20", 6, 231), ("2026-06-20", 5, 225),
+    ("2026-06-24", 8, 225),
+    ("2026-06-27", 4, 248), ("2026-06-27", 4, 242), ("2026-06-27", 6, 231),
+    ("2026-07-01", 5, 235), ("2026-07-01", 6, 225),
+    ("2026-07-05", 3, 254), ("2026-07-05", 4, 242), ("2026-07-05", 6, 231),
+    ("2026-07-08", 2, 265), ("2026-07-08", 5, 242),
+    ("2026-07-11", 5, 242), ("2026-07-11", 8, 225), ("2026-07-11", 8, 225),
+    ("2026-07-15", 2, 270), ("2026-07-15", 5, 242), ("2026-07-15", 7, 225),
+]
+
+bench_df = pd.DataFrame(bench_log_lbs, columns=["date", "reps", "weight_lbs"])
+bench_df["date"] = pd.to_datetime(bench_df["date"])
+bench_df["weight_kg"] = bench_df["weight_lbs"].apply(lbs_to_kg_rounded)
+bench_df["exercise"] = "bench"
+bench_df["set_id"] = bench_df.groupby("date").cumcount() + 1
+bench_df["session_type"] = "training"
+bench_df["pre_block_max_kg"] = 120
+
+# --- T-Bar Row (logged in lbs) ---
+tbar_log_lbs = [
+    ("2026-04-11", 11, 140), ("2026-04-11", 9, 160), ("2026-04-11", 10, 160),
+    ("2026-04-15", 9, 170), ("2026-04-15", 12, 170), ("2026-04-15", 8, 180),
+    ("2026-04-22", 10, 180), ("2026-04-22", 9, 180), ("2026-04-22", 8, 160),
+    ("2026-05-06", 9, 190), ("2026-05-06", 10, 180), ("2026-05-06", 11, 180),
+    ("2026-05-29", 8, 205), ("2026-05-29", 10, 205),
+    ("2026-06-02", 10, 225), ("2026-06-02", 7, 225),
+    ("2026-06-05", 5, 235), ("2026-06-05", 5, 235),
+    ("2026-06-12", 6, 250), ("2026-06-12", 11, 225), ("2026-06-12", 7, 225),
+    ("2026-06-23", 7, 260), ("2026-06-23", 6, 225),
+    ("2026-06-30", 6, 270), ("2026-06-30", 10, 225),
+    ("2026-07-14", 6, 270), ("2026-07-14", 13, 225),
+]
+
+tbar_df = pd.DataFrame(tbar_log_lbs, columns=["date", "reps", "weight_lbs"])
+tbar_df["date"] = pd.to_datetime(tbar_df["date"])
+tbar_df["weight_kg"] = tbar_df["weight_lbs"].apply(lbs_to_kg_rounded)
+tbar_df["exercise"] = "t_bar_row"
+tbar_df["set_id"] = tbar_df.groupby("date").cumcount() + 1
+tbar_df["session_type"] = "training"
+tbar_df["pre_block_max_kg"] = 60
+
+# --- Deadlift (logged in lbs) ---
+deadlift_log_lbs = [
+    ("2026-04-05", 3, 315), ("2026-04-05", 3, 295), ("2026-04-05", 3, 295), ("2026-04-05", 3, 295),
+    ("2026-04-11", 3, 335), ("2026-04-11", 3, 295), ("2026-04-11", 3, 305), ("2026-04-11", 3, 305), ("2026-04-11", 3, 305),
+    ("2026-04-18", 3, 358), ("2026-04-18", 5, 315), ("2026-04-18", 5, 315), ("2026-04-18", 5, 315),
+    ("2026-04-25", 3, 375), ("2026-04-25", 5, 332), ("2026-04-25", 4, 343), ("2026-04-25", 5, 332),
+    ("2026-05-02", 3, 390), ("2026-05-02", 3, 355), ("2026-05-02", 5, 355), ("2026-05-02", 5, 355),
+    ("2026-05-09", 3, 405), ("2026-05-09", 2, 375), ("2026-05-09", 3, 375), ("2026-05-09", 3, 355),
+    ("2026-06-23", 5, 353), ("2026-06-23", 5, 353), ("2026-06-23", 4, 375),
+    ("2026-06-30", 5, 375), ("2026-06-30", 5, 375), ("2026-06-30", 3, 396),
+    ("2026-07-03", 3, 397), ("2026-07-03", 3, 397), ("2026-07-03", 3, 355),
+    ("2026-07-07", 1, 419), ("2026-07-07", 1, 446.5), ("2026-07-07", 3, 383), ("2026-07-07", 3, 383),
+    ("2026-07-14", 3, 397), ("2026-07-14", 3, 397),
+    ("2026-07-21", 2, 419), ("2026-07-21", 2, 419), ("2026-07-21", 4, 375),
+]
+
+deadlift_df = pd.DataFrame(deadlift_log_lbs, columns=["date", "reps", "weight_lbs"])
+deadlift_df["date"] = pd.to_datetime(deadlift_df["date"])
+deadlift_df["weight_kg"] = deadlift_df["weight_lbs"].apply(lbs_to_kg_rounded)
+deadlift_df["exercise"] = "deadlift"
+deadlift_df["set_id"] = deadlift_df.groupby("date").cumcount() + 1
+deadlift_df["session_type"] = "training"
+deadlift_df["pre_block_max_kg"] = 160  # estimated from an untested 140kg x5, not a true tested max
+
+# --- Combine ---
+cols = ["date", "exercise", "set_id", "reps", "weight_kg", "session_type", "pre_block_max_kg"]
+df = pd.concat([squat_df[cols], bench_df[cols], tbar_df[cols], deadlift_df[cols]], ignore_index=True)
+
+# --- Week/day classification, per lift, relative to that lift's own block start ---
+df["block_start"] = df.groupby("exercise")["date"].transform("min")
+df["week_num"] = ((df["date"] - df["block_start"]).dt.days // 7) + 1
+df["day_num"] = df.groupby(["exercise", "week_num"])["date"].transform(lambda d: d.rank(method="dense").astype(int))
+df = df.drop(columns=["block_start"])
+
+df = df[["date", "week_num", "day_num", "exercise", "set_id", "reps", "weight_kg", "session_type", "pre_block_max_kg"]]
 df.to_csv("training_log.csv", index=False)
 print(df.shape)
-print(df.tail(12))
+print(df[df["exercise"] == "deadlift"][["date", "week_num", "day_num"]].drop_duplicates())
