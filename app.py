@@ -15,6 +15,19 @@ st.set_page_config(
 )
 if "messages" not in st.session_state:
     st.session_state.messages = []
+default_session_state = {
+    "messages": [],
+    "pending_maxes": None,
+    "pending_displayed_maxes": None,
+    "pending_unit": None,
+    "active_displayed_maxes": None,
+    "active_unit": None,
+    "generated_program": None,
+}
+
+for key, default_value in default_session_state.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
 
 with st.sidebar:
     st.header("Settings")
@@ -26,14 +39,58 @@ with st.sidebar:
         key="weight_unit",
     )
 
+    if st.session_state.get("pending_displayed_maxes") is not None:
+        maxes = st.session_state.pending_displayed_maxes
+        shown_unit = st.session_state.pending_unit
+        heading = "Pending maxes"
+
+    elif st.session_state.get("active_displayed_maxes") is not None:
+        maxes = st.session_state.active_displayed_maxes
+        shown_unit = st.session_state.active_unit
+        heading = "Program maxes"
+
+    else:
+        maxes = None
+        shown_unit = None
+        heading = None
+
+    if maxes is not None:
+        st.divider()
+        st.subheader(heading)
+
+        st.metric(
+            "Squat",
+            f"{maxes['squat']:.1f} {shown_unit}",
+        )
+        st.metric(
+            "Bench",
+            f"{maxes['bench']:.1f} {shown_unit}",
+        )
+        st.metric(
+            "Deadlift",
+            f"{maxes['deadlift']:.1f} {shown_unit}",
+        )
+
     st.divider()
 
     if st.button(
         "Clear chat",
         use_container_width=True,
+        key="clear_chat_button",
     ):
         st.session_state.messages = []
+
+        st.session_state.pending_maxes = None
+        st.session_state.pending_displayed_maxes = None
+        st.session_state.pending_unit = None
+
+        st.session_state.active_displayed_maxes = None
+        st.session_state.active_unit = None
+
+        st.session_state.generated_program = None
+
         st.rerun()
+
 st.title("ValAI - High Intensity Strength Training Coach")
 
 st.write(
@@ -203,9 +260,7 @@ if user_message:
         }
 
     st.session_state.messages.append(assistant_message)
-
-    with st.chat_message("assistant"):
-        st.markdown(assistant_message["content"])
+    st.rerun()  
 
 if st.session_state.get("pending_maxes") is not None:
     displayed_maxes = st.session_state.pending_displayed_maxes
@@ -217,7 +272,30 @@ if st.session_state.get("pending_maxes") is not None:
         f"Deadlift: {displayed_maxes['deadlift']:.1f} {pending_unit}"
     )
 
-    if st.button("Generate program", type="primary"):
+    button_col1, button_col2 = st.columns(2)
+
+    with button_col1:
+        generate_clicked = st.button(
+            "Generate program",
+            type="primary",
+            use_container_width=True,
+            key="generate_program_button",
+        )
+
+    with button_col2:
+        edit_clicked = st.button(
+            "Edit maxes",
+            use_container_width=True,
+            key="edit_maxes_button",
+        )
+
+    if edit_clicked:
+        st.session_state.pending_maxes = None
+        st.session_state.pending_displayed_maxes = None
+        st.session_state.pending_unit = None
+        st.rerun()
+
+    if generate_clicked:
         try:
             program, grouped_program = generate_program(
                 st.session_state.pending_maxes
@@ -244,14 +322,19 @@ if st.session_state.get("pending_maxes") is not None:
                 {
                     "role": "assistant",
                     "content": (
-                        "Your program is ready. "
+                        f"Your program is ready in {pending_unit}. "
                         "Open a lift below to view its sessions."
                     ),
                     "program": grouped_program,
+                    "unit": pending_unit,
                 }
             )
-
+            st.session_state.active_displayed_maxes = displayed_maxes
+            st.session_state.active_unit = pending_unit
             st.session_state.pending_maxes = None
+            st.session_state.pending_displayed_maxes = None
+            st.session_state.pending_unit = None
+
             st.rerun()
 
         except Exception as error:
