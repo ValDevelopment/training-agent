@@ -112,21 +112,28 @@ deadlift_df["pre_block_max_kg"] = 160  # estimated from an untested 140kg x5, no
 cols = ["date", "exercise", "set_id", "reps", "weight_kg", "session_type", "pre_block_max_kg"]
 df = pd.concat([squat_df[cols], bench_df[cols], deadlift_df[cols]], ignore_index=True)
 
-df["calendar_week"] = (
-    (df["date"] - df.groupby("exercise")["date"].transform("min")).dt.days // 7
-) + 1
+df["session_num"] = (
+    df.groupby("exercise")["date"]
+    .transform(lambda dates: dates.rank(method="dense").astype(int))
+)
+
+sessions_per_week = {
+    "squat": 2,
+    "bench": 2,
+    "deadlift": 1,
+}
+
+df["sessions_per_week"] = df["exercise"].map(sessions_per_week)
 
 df["week_num"] = (
-    df.groupby("exercise")["calendar_week"]
-    .transform(lambda x: x.rank(method="dense").astype(int))
-)
+    (df["session_num"] - 1) // df["sessions_per_week"]
+) + 1
 
 df["day_num"] = (
-    df.groupby(["exercise", "week_num"])["date"]
-    .transform(lambda d: d.rank(method="dense").astype(int))
-)
+    (df["session_num"] - 1) % df["sessions_per_week"]
+) + 1
 
-df = df.drop(columns=["calendar_week"])
+df = df.drop(columns=["session_num", "sessions_per_week"])
 
 df = df[["date", "week_num", "day_num", "exercise", "set_id", "reps", "weight_kg", "session_type", "pre_block_max_kg"]]
 df.to_csv("training_log.csv", index=False)

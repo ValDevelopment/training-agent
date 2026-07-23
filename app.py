@@ -1,5 +1,5 @@
 from importlib import import_module
-
+import re
 import streamlit as st
 
 
@@ -9,12 +9,29 @@ generate_program = generator_module.generate_program
 
 
 st.set_page_config(
-    page_title="AI Powerlifting Coach",
+    page_title="ValAI - High Intensity Strength Training Coach",
     page_icon="🏋️",
     layout="centered",
 )
+with st.sidebar:
+    st.header("Settings")
 
-st.title("AI Powerlifting Coach")
+    unit = st.radio(
+        "Weight unit",
+        options=["kg", "lb"],
+        horizontal=True,
+        key="weight_unit",
+    )
+
+    st.divider()
+
+    if st.button(
+        "Clear chat",
+        use_container_width=True,
+    ):
+        st.session_state.messages = []
+        st.rerun()
+st.title("ValAI - High Intensity Strength Training Coach")
 
 st.write(
     "Enter your squat, bench, and deadlift maxes, "
@@ -49,6 +66,15 @@ def display_program(grouped_program):
                     with column:
                         st.markdown(f"### Week {week_num}")
 
+                        if exercise == "squat" and week_num == 8:
+                            st.markdown("**Session 1**")
+                            st.markdown("- Test new max")
+
+                            st.markdown("**Session 2**")
+                            st.markdown("- Rest (optional)")
+
+                            continue
+
                         for day_num, day_data in week_data.groupby(
                             "day_num",
                             sort=True,
@@ -58,7 +84,7 @@ def display_program(grouped_program):
                             for prescription in day_data["prescription"]:
                                 st.markdown(f"- {prescription}")
 
-                        st.markdown("")
+                            st.markdown("")
 
 
 
@@ -76,11 +102,41 @@ for message in st.session_state.messages:
         ):
             display_program(message["program"])
 
-
 user_message = st.chat_input(
     "Example: My squat is 180 kg, bench is 125 kg, "
     "and deadlift is 220 kg."
 )
+
+def extract_maxes(user_message):
+    text = user_message.lower().strip()
+    maxes = {}
+
+    # Case 1: explicit lift names in either order
+    for lift in ["squat", "bench", "deadlift"]:
+        lift_then_number = rf"\b{lift}\b\D{{0,15}}(\d+(?:\.\d+)?)"
+        number_then_lift = rf"(\d+(?:\.\d+)?)\D{{0,15}}\b{lift}\b"
+
+        match = re.search(lift_then_number, text)
+
+        if not match:
+            match = re.search(number_then_lift, text)
+
+        if match:
+            maxes[lift] = float(match.group(1))
+
+    # Case 2: shorthand such as "SBD 120 130 140"
+    if len(maxes) < 3 and re.search(r"\bsbd\b", text):
+        numbers = re.findall(r"\d+(?:\.\d+)?", text)
+
+        if len(numbers) >= 3:
+            maxes = {
+                "squat": float(numbers[0]),
+                "bench": float(numbers[1]),
+                "deadlift": float(numbers[2]),
+            }
+
+    return maxes
+
 
 
 if user_message:
@@ -94,16 +150,30 @@ if user_message:
     with st.chat_message("user"):
         st.markdown(user_message)
 
-    # Temporary hardcoded maxes.
-    # The LLM will extract these from the user's message later.
-    current_maxes = {
-        "squat": 180,
-        "bench": 125,
-        "deadlift": 220,
-    }
+    current_maxes = extract_maxes(user_message)
+    if unit == "lb":
+        current_maxes = {
+            lift: value * 0.453592
+            for lift, value in current_maxes.items()
+        }
 
     try:
         program, grouped_program = generate_program(current_maxes)
+        if unit == "lb":
+            grouped_program = grouped_program.copy()
+
+            grouped_program["prescribed_weight_kg"] = (
+                grouped_program["prescribed_weight_kg"] / 0.453592
+            )
+
+            grouped_program["prescription"] = (
+                grouped_program["num_sets"].astype(str)
+                + " x "
+                + grouped_program["reps"].astype(str)
+                + " @ "
+                + grouped_program["prescribed_weight_kg"].round(1).astype(str)
+                + " lb"
+            )
 
         assistant_message = {
             "role": "assistant",
