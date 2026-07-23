@@ -143,22 +143,34 @@ program, grouped_program = generate_program(current_maxes)
 def format_program(grouped_program):
     lines = []
 
-    for week_num, week_data in grouped_program.groupby("week_num", sort=True):
-        lines.append(f"WEEK {week_num}")
+    for exercise, exercise_data in grouped_program.groupby(
+        "exercise",
+        sort=False,
+    ):
+        lines.append(f"# {exercise.title()}")
+        lines.append("")
 
-        for day_num, day_data in week_data.groupby("day_num", sort=True):
-            lines.append(f"Day {day_num}")
-
-            for exercise, exercise_data in day_data.groupby(
-                "exercise",
-                sort=False,
-            ):
-                lines.append(exercise.upper())
-
-                for prescription in exercise_data["prescription"]:
-                    lines.append(f"  {prescription}")
-
+        for week_num, week_data in exercise_data.groupby(
+            "week_num",
+            sort=True,
+        ):
+            lines.append(f"## Week {week_num}")
             lines.append("")
+
+            for day_num, day_data in week_data.groupby(
+                "day_num",
+                sort=True,
+            ):
+                lines.append(f"### Session {day_num}")
+                lines.append("")
+
+                for prescription in day_data["prescription"]:
+                    lines.append(f"- {prescription}")
+
+                lines.append("")
+
+        lines.append("---")
+        lines.append("")
 
     return "\n".join(lines)
 
