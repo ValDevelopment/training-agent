@@ -13,6 +13,9 @@ st.set_page_config(
     page_icon="🏋️",
     layout="centered",
 )
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 with st.sidebar:
     st.header("Settings")
 
@@ -102,6 +105,11 @@ for message in st.session_state.messages:
         ):
             display_program(message["program"])
 
+st.caption(
+    f"Using {unit}. Examples: "
+    f"`squat 180 bench 125 deadlift 220` or `SBD 180 125 220`."
+)
+
 user_message = st.chat_input(
     "Example: My squat is 180 kg, bench is 125 kg, "
     "and deadlift is 220 kg."
@@ -150,41 +158,45 @@ if user_message:
     with st.chat_message("user"):
         st.markdown(user_message)
 
-    current_maxes = extract_maxes(user_message)
-    if unit == "lb":
-        current_maxes = {
-            lift: value * 0.453592
-            for lift, value in current_maxes.items()
-        }
-
     try:
-        program, grouped_program = generate_program(current_maxes)
+        current_maxes = extract_maxes(user_message)
+
+        if len(current_maxes) != 3:
+            raise ValueError(
+                "Please provide squat, bench, and deadlift maxes."
+            )
+
+        # Keep the original values for display.
+        displayed_maxes = current_maxes.copy()
+
+        # Convert user inputs to kilograms for the generator.
         if unit == "lb":
-            grouped_program = grouped_program.copy()
+            current_maxes = {
+                lift: value * 0.453592
+                for lift, value in current_maxes.items()
+            }
 
-            grouped_program["prescribed_weight_kg"] = (
-                grouped_program["prescribed_weight_kg"] / 0.453592
-            )
-
-            grouped_program["prescription"] = (
-                grouped_program["num_sets"].astype(str)
-                + " x "
-                + grouped_program["reps"].astype(str)
-                + " @ "
-                + grouped_program["prescribed_weight_kg"].round(1).astype(str)
-                + " lb"
-            )
+        st.session_state.pending_maxes = current_maxes
+        st.session_state.pending_displayed_maxes = displayed_maxes
+        st.session_state.pending_unit = unit
+        st.session_state.generated_program = None
 
         assistant_message = {
             "role": "assistant",
             "content": (
-                "Your program is ready. "
-                "Open a lift below to view its sessions."
+                f"Parsed maxes: "
+                f"Squat: {displayed_maxes['squat']:.1f} {unit}, "
+                f"Bench: {displayed_maxes['bench']:.1f} {unit}, "
+                f"Deadlift: {displayed_maxes['deadlift']:.1f} {unit}. "
+                f"Confirm below to generate the program."
             ),
-            "program": grouped_program,
         }
 
     except Exception as error:
+        st.session_state.pending_maxes = None
+        st.session_state.pending_displayed_maxes = None
+        st.session_state.pending_unit = None
+
         assistant_message = {
             "role": "assistant",
             "content": f"Program generation failed: `{error}`",
@@ -195,5 +207,52 @@ if user_message:
     with st.chat_message("assistant"):
         st.markdown(assistant_message["content"])
 
-        if "program" in assistant_message:
-            display_program(assistant_message["program"])
+if st.session_state.get("pending_maxes") is not None:
+    displayed_maxes = st.session_state.pending_displayed_maxes
+    pending_unit = st.session_state.pending_unit
+
+    st.info(
+        f"Squat: {displayed_maxes['squat']:.1f} {pending_unit} | "
+        f"Bench: {displayed_maxes['bench']:.1f} {pending_unit} | "
+        f"Deadlift: {displayed_maxes['deadlift']:.1f} {pending_unit}"
+    )
+
+    if st.button("Generate program", type="primary"):
+        try:
+            program, grouped_program = generate_program(
+                st.session_state.pending_maxes
+            )
+
+            if pending_unit == "lb":
+                grouped_program = grouped_program.copy()
+
+                grouped_program["prescription"] = (
+                    grouped_program["num_sets"].astype(str)
+                    + " x "
+                    + grouped_program["reps"].astype(str)
+                    + " @ "
+                    + (
+                        grouped_program["prescribed_weight_kg"]
+                        / 0.453592
+                    ).round(1).astype(str)
+                    + " lb"
+                )
+
+            st.session_state.generated_program = grouped_program
+
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": (
+                        "Your program is ready. "
+                        "Open a lift below to view its sessions."
+                    ),
+                    "program": grouped_program,
+                }
+            )
+
+            st.session_state.pending_maxes = None
+            st.rerun()
+
+        except Exception as error:
+            st.error(f"Program generation failed: {error}")
