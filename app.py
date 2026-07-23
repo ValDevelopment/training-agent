@@ -61,9 +61,7 @@ def display_program(grouped_program):
                         st.markdown("")
 
 
-# -----------------------------
-# Chat history
-# -----------------------------
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -79,9 +77,6 @@ for message in st.session_state.messages:
             display_program(message["program"])
 
 
-# -----------------------------
-# Chat input
-# -----------------------------
 user_message = st.chat_input(
     "Example: My squat is 180 kg, bench is 125 kg, "
     "and deadlift is 220 kg."
