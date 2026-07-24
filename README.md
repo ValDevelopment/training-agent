@@ -4,7 +4,7 @@ An AI agent that generates personalized strength training programming, grounded 
 
 ## Objective
 
-Population-level strength training research is derived from group averages across highly individualized responses. Grounding programming decisions in an individual's own multi-year, self-observed training results provides a more directly applicable basis for that individual's own program design than general published guidance.
+Population-level strength training research is derived from group averages across highly individualized responses. Grounding programming decisions in an my own multi-year, self-observed training results provides a more directly applicable basis for program design than general published guidance.
 
 ## Data
 
@@ -66,6 +66,6 @@ streamlit run app.py
 
 ## Limitations
 
-- The dataset reflects one individual's response to training; extracted patterns may not generalize universally, though this is partly mitigated by focusing on percent-of-max relative patterns, not absolute loads.
+- The dataset reflects one individual's (mine) response to training; extracted patterns may not generalize universally, though this is partly mitigated by focusing on percent-of-max relative patterns.
 - The deadlift's pre-block max is an estimate, not a directly tested value.
 - The bench press block was incomplete as of the most recent update; its scheduled deload and max test had not yet occurred.
