@@ -28,10 +28,6 @@ The pipeline runs in three stages:
 
 `week_num` and `day_num` are computed per lift, relative to that lift's own block start, allowing blocks of different real-world calendar lengths to be compared on a common training-week basis.
 
-## Key Finding
-
-The user's own weekly percent-of-max progression runs noticeably more intense (closer to failure, higher percent of 1RM) than typical published programming templates recommend. This is treated as a deliberate, core part of the training philosophy this project encodes, not as an anomaly to correct.
-
 ## Repository Structure
 
 ```
