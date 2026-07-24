@@ -1,8 +1,8 @@
 import pandas as pd
 
-weekly_pattern = pd.read_csv("weekly_programming_patterns.csv")
+weekly_pattern = pd.read_csv("data/processed/weekly_programming_patterns.csv")
 
-training_log = pd.read_csv("training_log.csv", parse_dates=["date"])
+training_log = pd.read_csv("data/raw/training_log.csv", parse_dates=["date"])
 
 
 patterns_by_lift = {
@@ -37,7 +37,7 @@ squat_template = squat_sets[
     ]
 ].copy()
 
-squat_template.to_csv("squat_programming_template.csv", index=False)
+squat_template.to_csv("data/templates/squat_programming_template.csv", index=False)
 
 
 bench_sets = (
@@ -65,7 +65,7 @@ bench_template = bench_sets[
     ]
 ].copy()
 
-bench_template.to_csv("bench_programming_template.csv", index=False)
+bench_template.to_csv("data/templates/bench_programming_template.csv", index=False)
 
 
 deadlift_sets = (
@@ -93,7 +93,7 @@ deadlift_template = deadlift_sets[
     ]
 ].copy()
 
-deadlift_template.to_csv("deadlift_programming_template.csv", index=False)
+deadlift_template.to_csv("data/templates/deadlift_programming_template.csv", index=False)
 
 
 squat_template["exercise"] = "squat"
@@ -117,7 +117,7 @@ sbd_template = sbd_template[
     ]
 ]
 
-sbd_template.to_csv("sbd_programming_template.csv", index=False)
+sbd_template.to_csv("data/templates/sbd_programming_template.csv", index=False)
 
 print(sbd_template.head())
 print(sbd_template.shape)

@@ -1,6 +1,6 @@
 import pandas as pd
 
-template = pd.read_csv("sbd_programming_template.csv")
+template = pd.read_csv("data/templates/sbd_programming_template.csv")
 
 current_maxes = {
     "squat": 155,
@@ -33,9 +33,7 @@ print(
 template = template.sort_values(
     ["week_num", "day_num", "exercise", "set_id"]
 ).reset_index(drop=True)
-template.to_csv("generated_sbd_program.csv", index=False)
-
-print("Saved to generated_sbd_program.csv")
+template.to_csv("data/generated/generated_sbd_program.csv", index=False)
 
 grouped_program = (
     template
@@ -64,12 +62,10 @@ grouped_program["prescription"] = (
 
 print(grouped_program.head(15))
 
-grouped_program.to_csv("generated_sbd_program_readable.csv", index=False)
-
-print("Saved to generated_sbd_program_readable.csv")
+grouped_program.to_csv("data/generated/generated_sbd_program_readable.csv", index=False)
 
 def generate_program(current_maxes):
-    program = pd.read_csv("sbd_programming_template.csv")
+    program = pd.read_csv("data/templates/sbd_programming_template.csv")
 
     program["prescribed_weight_kg"] = program.apply(
         lambda row: (
@@ -179,4 +175,6 @@ program, grouped_program = generate_program(current_maxes)
 formatted_program = format_program(grouped_program)
 
 print(formatted_program)
+
+
 

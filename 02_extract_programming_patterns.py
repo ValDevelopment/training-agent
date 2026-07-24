@@ -1,6 +1,6 @@
 import pandas as pd
 
-df = pd.read_csv("training_log.csv", parse_dates=["date"])
+df = pd.read_csv("data/raw/training_log.csv", parse_dates=["date"])
 
 df["pct_of_max"] = (df["weight_kg"] / df["pre_block_max_kg"] * 100).round(1)
 df["volume_kg"] = df["reps"] * df["weight_kg"]
@@ -17,6 +17,6 @@ weekly_pattern = (df.groupby(["exercise", "week_num"])
                     .reset_index()
                     .sort_values(["exercise", "week_num"]))
 
-weekly_pattern.to_csv("weekly_programming_patterns.csv", index=False)
+weekly_pattern.to_csv("data/processed/weekly_programming_patterns.csv", index=False)
 print(weekly_pattern.to_string(index=False))
 

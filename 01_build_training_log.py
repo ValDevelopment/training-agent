@@ -136,6 +136,6 @@ df["day_num"] = (
 df = df.drop(columns=["session_num", "sessions_per_week"])
 
 df = df[["date", "week_num", "day_num", "exercise", "set_id", "reps", "weight_kg", "session_type", "pre_block_max_kg"]]
-df.to_csv("training_log.csv", index=False)
+df.to_csv("data/raw/training_log.csv", index=False)
 print(df.shape)
 print(df[df["exercise"] == "deadlift"][["date", "week_num", "day_num"]].drop_duplicates())
