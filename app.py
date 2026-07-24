@@ -1,7 +1,8 @@
 from importlib import import_module
 import re
 import streamlit as st
-
+import json
+from groq import Groq
 
 generator_module = import_module("04_program_generator")
 
@@ -24,6 +25,10 @@ default_session_state = {
     "active_unit": None,
     "generated_program": None,
 }
+
+groq_client = Groq(
+    api_key=st.secrets["GROQ_API_KEY"]
+)
 
 for key, default_value in default_session_state.items():
     if key not in st.session_state:
@@ -202,6 +207,87 @@ def extract_maxes(user_message):
 
     return maxes
 
+def extract_maxes_with_groq(user_message):
+    response = groq_client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Extract the user's squat, bench press, and "
+                    "deadlift one-rep maxes. Return JSON only with "
+                    "exactly these keys: squat, bench, deadlift. "
+                    "Each value must be a number or null. "
+                    "For shorthand such as 'SBD 180 120 220', "
+                    "interpret the values as squat, bench, deadlift "
+                    "in that order. Do not convert units."
+                ),
+            },
+            {
+                "role": "user",
+                "content": user_message,
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+
+    content = response.choices[0].message.content
+    extracted = json.loads(content)
+
+    return {
+        lift: float(extracted[lift])
+        for lift in ["squat", "bench", "deadlift"]
+        if extracted.get(lift) is not None
+    }
+
+def explain_program(grouped_program, displayed_maxes, unit):
+    program_summary = grouped_program[
+        [
+            "exercise",
+            "week_num",
+            "day_num",
+            "prescription",
+        ]
+    ].to_dict(orient="records")
+
+    response = groq_client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are the conversational assistant for a powerlifting "
+                    "program generator. The program has already been generated "
+                    "by a deterministic backend.\n\n"
+
+                    "Explain the program confidently and directly. Do not use "
+                    "phrases such as 'it appears', 'it seems', or 'may be'.\n\n"
+
+                    "Only describe information that is explicitly present in the "
+                    "provided program data. Do not infer deload weeks, recovery "
+                    "weeks, training blocks, peaking phases, progressive overload, "
+                    "or the purpose of unusual prescriptions unless that information "
+                    "is explicitly supplied.\n\n"
+
+                    "Do not mention or interpret individual week numbers. Do not "
+                    "comment on unusual, low, or high weights. Do not criticize the "
+                    "program and do not suggest changes.\n\n"
+
+                    "Briefly tell the user that the program includes squat, bench, "
+                    "and deadlift sessions, that the weights were calculated from "
+                    "their supplied maxes, and that they can open each lift to view "
+                    "the full schedule.\n\n"
+
+                    "Keep the response between 50 and 90 words."
+                ),
+            },
+        ],
+        temperature=0.3,
+    )
+
+    return response.choices[0].message.content
+
 
 
 if user_message:
@@ -216,7 +302,10 @@ if user_message:
         st.markdown(user_message)
 
     try:
-        current_maxes = extract_maxes(user_message)
+        try:
+            current_maxes = extract_maxes_with_groq(user_message)
+        except Exception:
+            urrent_maxes = extract_maxes(user_message)
 
         if len(current_maxes) != 3:
             raise ValueError(
@@ -316,19 +405,32 @@ if st.session_state.get("pending_maxes") is not None:
                     + " lb"
                 )
 
+            try:
+                explanation = explain_program(
+                    grouped_program,
+                    displayed_maxes,
+                    pending_unit,
+                )
+            except Exception:
+                explanation = (
+                    "Your program follows the stored SBD progression "
+                    "and scales each prescription from your provided maxes."
+    )
+
             st.session_state.generated_program = grouped_program
 
             st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": (
-                        f"Your program is ready in {pending_unit}. "
-                        "Open a lift below to view its sessions."
-                    ),
-                    "program": grouped_program,
-                    "unit": pending_unit,
-                }
-            )
+            {
+                "role": "assistant",
+                "content": (
+                    f"Your program is ready in {pending_unit}.\n\n"
+                    f"{explanation}\n\n"
+                    "Open a lift below to view its sessions."
+                ),
+                "program": grouped_program,
+                "unit": pending_unit,
+            }
+)
             st.session_state.active_displayed_maxes = displayed_maxes
             st.session_state.active_unit = pending_unit
             st.session_state.pending_maxes = None
