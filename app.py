@@ -3,14 +3,10 @@ import re
 import streamlit as st
 import json
 from groq import Groq
-
-generator_module = import_module("04_program_generator")
-
-generate_program = generator_module.generate_program
-
+from src.program_generator import generate_program
 
 st.set_page_config(
-    page_title="ValAI - High Intensity Strength Training Coach",
+    page_title="High Intensity Strength Programming Coach",
     page_icon="🏋️",
     layout="centered",
 )
@@ -96,7 +92,7 @@ with st.sidebar:
 
         st.rerun()
 
-st.title("ValAI - High Intensity Strength Training Coach")
+st.title("High Intensity Strength Programming Coach")
 
 st.write(
     "Enter your squat, bench, and deadlift maxes, "
