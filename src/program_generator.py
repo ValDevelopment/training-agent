@@ -64,6 +64,57 @@ print(grouped_program.head(15))
 
 grouped_program.to_csv("data/generated/generated_sbd_program_readable.csv", index=False)
 
+
+def get_session(
+    grouped_program,
+    exercise,
+    week_num,
+    day_num,
+):
+    exercise = exercise.lower().strip()
+
+    session = grouped_program[
+        (grouped_program["exercise"] == exercise)
+        & (grouped_program["week_num"] == week_num)
+        & (grouped_program["day_num"] == day_num)
+    ].copy()
+
+    if session.empty:
+        return None
+
+    return session[
+        [
+            "exercise",
+            "week_num",
+            "day_num",
+            "prescription",
+        ]
+    ]
+
+def get_week(
+    grouped_program,
+    exercise,
+    week_num,
+):
+    exercise = exercise.lower().strip()
+
+    week_data = grouped_program[
+        (grouped_program["exercise"] == exercise)
+        & (grouped_program["week_num"] == week_num)
+    ].copy()
+
+    if week_data.empty:
+        return None
+
+    return week_data[
+        [
+            "exercise",
+            "week_num",
+            "day_num",
+            "prescription",
+        ]
+    ]
+
 def generate_program(current_maxes):
     program = pd.read_csv("data/templates/sbd_programming_template.csv")
 

@@ -3,7 +3,11 @@ import re
 import streamlit as st
 import json
 from groq import Groq
-from src.program_generator import generate_program
+from src.program_generator import (
+    generate_program,
+    get_session,
+    get_week,
+)
 
 st.set_page_config(
     page_title="High Intensity Strength Programming Coach",
@@ -237,6 +241,40 @@ def extract_maxes_with_groq(user_message):
         if extracted.get(lift) is not None
     }
 
+def extract_session_request(user_message):
+    text = user_message.lower().strip()
+
+    exercise = None
+
+    for lift in ["squat", "bench", "deadlift"]:
+        if lift in text:
+            exercise = lift
+            break
+
+    week_match = re.search(
+        r"\bweek\s*(\d+)\b",
+        text,
+    )
+
+    session_match = re.search(
+        r"\b(?:session|day)\s*(\d+)\b",
+        text,
+    )
+
+    if not exercise or not week_match:
+        return None
+
+    request = {
+        "exercise": exercise,
+        "week_num": int(week_match.group(1)),
+        "day_num": None,
+    }
+
+    if session_match:
+        request["day_num"] = int(session_match.group(1))
+
+    return request
+
 def explain_program(grouped_program, displayed_maxes, unit):
     program_summary = grouped_program[
         [
@@ -294,58 +332,156 @@ if user_message:
 
     st.session_state.messages.append(user_chat_message)
 
-    with st.chat_message("user"):
-        st.markdown(user_message)
-
     try:
-        try:
-            current_maxes = extract_maxes_with_groq(user_message)
-        except Exception:
-            urrent_maxes = extract_maxes(user_message)
+        session_request = extract_session_request(user_message)
 
-        if len(current_maxes) != 3:
-            raise ValueError(
-                "Please provide squat, bench, and deadlift maxes."
+        if session_request is not None:
+            if st.session_state.generated_program is None:
+                assistant_message = {
+                    "role": "assistant",
+                    "content": (
+                        "Generate a program first, then you can ask "
+                        "about a specific lift, week, and session."
+                    ),
+                }
+
+            else:
+                # Specific session request
+                if session_request["day_num"] is not None:
+                    session_data = get_session(
+                        st.session_state.generated_program,
+                        session_request["exercise"],
+                        session_request["week_num"],
+                        session_request["day_num"],
+                    )
+
+                    if session_data is None:
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": (
+                                "I could not find that session in your "
+                                "generated program."
+                            ),
+                        }
+
+                    else:
+                        prescriptions = session_data[
+                            "prescription"
+                        ].tolist()
+
+                        formatted_prescriptions = "\n".join(
+                            f"- {prescription}"
+                            for prescription in prescriptions
+                        )
+
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": (
+                                f"**{session_request['exercise'].title()} — "
+                                f"Week {session_request['week_num']}, "
+                                f"Session {session_request['day_num']}**\n\n"
+                                f"{formatted_prescriptions}"
+                            ),
+                        }
+
+                # Whole-week request
+                else:
+                    week_data = get_week(
+                        st.session_state.generated_program,
+                        session_request["exercise"],
+                        session_request["week_num"],
+                    )
+
+                    if week_data is None:
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": (
+                                "I could not find that week in your "
+                                "generated program."
+                            ),
+                        }
+
+                    else:
+                        week_sections = []
+
+                        for day_num, day_data in week_data.groupby(
+                            "day_num",
+                            sort=True,
+                        ):
+                            prescriptions = day_data[
+                                "prescription"
+                            ].tolist()
+
+                            formatted_prescriptions = "\n".join(
+                                f"- {prescription}"
+                                for prescription in prescriptions
+                            )
+
+                            week_sections.append(
+                                f"**Session {day_num}**\n"
+                                f"{formatted_prescriptions}"
+                            )
+
+                        formatted_week = "\n\n".join(week_sections)
+
+                        assistant_message = {
+                            "role": "assistant",
+                            "content": (
+                                f"**{session_request['exercise'].title()} — "
+                                f"Week {session_request['week_num']}**\n\n"
+                                f"{formatted_week}"
+                            ),
+                        }
+
+        else:
+            try:
+                current_maxes = extract_maxes_with_groq(
+                    user_message
+                )
+            except Exception:
+                current_maxes = extract_maxes(user_message)
+
+            if len(current_maxes) != 3:
+                raise ValueError(
+                    "Please provide squat, bench, and deadlift maxes."
+                )
+
+            # Keep the original values for display.
+            displayed_maxes = current_maxes.copy()
+
+            # Convert pounds to kilograms for the generator.
+            if unit == "lb":
+                current_maxes = {
+                    lift: value * 0.453592
+                    for lift, value in current_maxes.items()
+                }
+
+            st.session_state.pending_maxes = current_maxes
+            st.session_state.pending_displayed_maxes = (
+                displayed_maxes
             )
+            st.session_state.pending_unit = unit
 
-        # Keep the original values for display.
-        displayed_maxes = current_maxes.copy()
-
-        # Convert user inputs to kilograms for the generator.
-        if unit == "lb":
-            current_maxes = {
-                lift: value * 0.453592
-                for lift, value in current_maxes.items()
+            assistant_message = {
+                "role": "assistant",
+                "content": (
+                    f"Parsed maxes: "
+                    f"Squat: {displayed_maxes['squat']:.1f} {unit}, "
+                    f"Bench: {displayed_maxes['bench']:.1f} {unit}, "
+                    f"Deadlift: "
+                    f"{displayed_maxes['deadlift']:.1f} {unit}. "
+                    f"Confirm below to generate the program."
+                ),
             }
 
-        st.session_state.pending_maxes = current_maxes
-        st.session_state.pending_displayed_maxes = displayed_maxes
-        st.session_state.pending_unit = unit
-        st.session_state.generated_program = None
-
-        assistant_message = {
-            "role": "assistant",
-            "content": (
-                f"Parsed maxes: "
-                f"Squat: {displayed_maxes['squat']:.1f} {unit}, "
-                f"Bench: {displayed_maxes['bench']:.1f} {unit}, "
-                f"Deadlift: {displayed_maxes['deadlift']:.1f} {unit}. "
-                f"Confirm below to generate the program."
-            ),
-        }
-
     except Exception as error:
-        st.session_state.pending_maxes = None
-        st.session_state.pending_displayed_maxes = None
-        st.session_state.pending_unit = None
-
         assistant_message = {
             "role": "assistant",
-            "content": f"Program generation failed: `{error}`",
+            "content": f"Request failed: `{error}`",
         }
 
     st.session_state.messages.append(assistant_message)
-    st.rerun()  
+    st.rerun()
 
 if st.session_state.get("pending_maxes") is not None:
     displayed_maxes = st.session_state.pending_displayed_maxes
