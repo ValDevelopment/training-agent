@@ -4,7 +4,7 @@ An AI agent that generates personalized strength training programming, grounded 
 
 ## Objective
 
-Population-level strength training research is derived from group averages across highly individualized responses. Grounding programming decisions in an individual's own multi-year, self-observed training results provides a more directly applicable basis for that individual's own program design than general published guidance.
+Population-level strength training research is derived from group averages across highly individualized responses. Grounding programming decisions in an my own multi-year, self-observed training results provides a more directly applicable basis for program design than general published guidance.
 
 ## Data
 
@@ -27,10 +27,6 @@ The pipeline runs in three stages:
 3. **Program generation** (`src/program_generator.py`): the extracted patterns and templates feed a generator that produces a new SBD (squat, bench, deadlift) training program, output as both a machine-readable and a human-readable CSV.
 
 `week_num` and `day_num` are computed per lift, relative to that lift's own block start, allowing blocks of different real-world calendar lengths to be compared on a common training-week basis.
-
-## Key Finding
-
-The user's own weekly percent-of-max progression runs noticeably more intense (closer to failure, higher percent of 1RM) than typical published programming templates recommend. This is treated as a deliberate, core part of the training philosophy this project encodes, not as an anomaly to correct.
 
 ## Repository Structure
 
@@ -70,6 +66,6 @@ streamlit run app.py
 
 ## Limitations
 
-- The dataset reflects one individual's response to training; extracted patterns may not generalize universally, though this is partly mitigated by focusing on percent-of-max relative patterns, not absolute loads.
+- The dataset reflects one individual's (mine) response to training; extracted patterns may not generalize universally, though this is partly mitigated by focusing on percent-of-max relative patterns.
 - The deadlift's pre-block max is an estimate, not a directly tested value.
 - The bench press block was incomplete as of the most recent update; its scheduled deload and max test had not yet occurred.
