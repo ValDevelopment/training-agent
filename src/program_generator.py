@@ -228,4 +228,65 @@ formatted_program = format_program(grouped_program)
 print(formatted_program)
 
 
+def get_lift_summary(
+    grouped_program,
+    exercise,
+):
+    exercise = exercise.lower().strip()
+
+    lift_data = grouped_program[
+        grouped_program["exercise"] == exercise
+    ].copy()
+
+    if lift_data.empty:
+        return None
+
+    return lift_data[
+        [
+            "exercise",
+            "week_num",
+            "day_num",
+            "num_sets",
+            "reps",
+            "prescribed_weight_kg",
+            "prescription",
+        ]
+    ]
+
+
+def get_heaviest_set(
+    grouped_program,
+    exercise,
+):
+    exercise = exercise.lower().strip()
+
+    lift_data = grouped_program[
+        grouped_program["exercise"] == exercise
+    ].copy()
+
+    if exercise == "squat":
+        lift_data = lift_data[
+            lift_data["week_num"] != 8
+        ]
+
+    if lift_data.empty:
+        return None
+
+    heaviest_weight = lift_data[
+        "prescribed_weight_kg"
+    ].max()
+
+    return lift_data[
+        lift_data["prescribed_weight_kg"] == heaviest_weight
+    ][
+        [
+            "exercise",
+            "week_num",
+            "day_num",
+            "prescription",
+            "prescribed_weight_kg",
+        ]
+    ].copy()
+
+
 

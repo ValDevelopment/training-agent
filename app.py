@@ -7,6 +7,8 @@ from src.program_generator import (
     generate_program,
     get_session,
     get_week,
+    get_lift_summary,
+    get_heaviest_set,
 )
 
 st.set_page_config(
@@ -24,6 +26,7 @@ default_session_state = {
     "active_displayed_maxes": None,
     "active_unit": None,
     "generated_program": None,
+    "last_request_type": None,
 }
 
 groq_client = Groq(
@@ -83,6 +86,8 @@ with st.sidebar:
         use_container_width=True,
         key="clear_chat_button",
     ):
+
+        
         st.session_state.messages = []
 
         st.session_state.pending_maxes = None
@@ -93,6 +98,8 @@ with st.sidebar:
         st.session_state.active_unit = None
 
         st.session_state.generated_program = None
+
+        st.session_state.last_request_type = None
 
         st.rerun()
 
@@ -273,7 +280,85 @@ def extract_session_request(user_message):
     if session_match:
         request["day_num"] = int(session_match.group(1))
 
+    st.session_state.last_request_type = "session"
     return request
+
+
+def extract_lift_summary_request(user_message):
+    text = user_message.lower().strip()
+
+    if re.search(r"\b(?:week|session|day)\s*\d+\b", text):
+        return None
+
+    summary_phrases = [
+        "summarize",
+        "summary",
+        "overview",
+        "describe",
+        "explain",
+    ]
+
+    has_summary_phrase = any(
+        phrase in text
+        for phrase in summary_phrases
+    )
+
+    is_context_followup = (
+        st.session_state.get("last_request_type") == "summary"
+        and any(
+            phrase in text
+            for phrase in ["what about", "how about"]
+        )
+    )
+
+    if not has_summary_phrase and not is_context_followup:
+        return None
+
+    for lift in ["squat", "bench", "deadlift"]:
+        st.session_state.last_request_type = "summary"
+        if lift in text:
+            return {
+                "exercise": lift,
+            }
+
+    return None
+
+
+def extract_heaviest_set_request(user_message):
+    text = user_message.lower().strip()
+
+    heaviest_phrases = [
+        "heaviest",
+        "highest weight",
+        "max weight",
+        "top weight",
+    ]
+
+    has_heaviest_phrase = any(
+        phrase in text
+        for phrase in heaviest_phrases
+    )
+
+    is_context_followup = (
+        st.session_state.get("last_request_type") == "heaviest"
+        and any(
+            phrase in text
+            for phrase in ["what about", "how about"]
+        )
+    )
+
+    if not has_heaviest_phrase and not is_context_followup:
+        return None
+
+    for lift in ["squat", "bench", "deadlift"]:
+        if lift in text:
+            st.session_state.last_request_type = "heaviest"
+            return {
+                "exercise": lift,
+            }
+
+    return None
+
 
 def explain_program(grouped_program, displayed_maxes, unit):
     program_summary = grouped_program[
@@ -334,8 +419,164 @@ if user_message:
 
     try:
         session_request = extract_session_request(user_message)
+        summary_request = extract_lift_summary_request(user_message)
+        heaviest_request = extract_heaviest_set_request(user_message)
 
-        if session_request is not None:
+
+
+        if heaviest_request is not None:
+            if st.session_state.generated_program is None:
+                assistant_message = {
+                    "role": "assistant",
+                    "content": (
+                        "Generate a program first, then I can find "
+                        "the heaviest set for a lift."
+                    ),
+                }
+
+            else:
+                heaviest_data = get_heaviest_set(
+                    st.session_state.generated_program,
+                    heaviest_request["exercise"],
+                )
+
+                if heaviest_data is None:
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": (
+                            "I could not find that lift in your "
+                            "generated program."
+                        ),
+                    }
+
+                else:
+                    summary_unit = (
+                        st.session_state.active_unit
+                        or st.session_state.pending_unit
+                        or unit
+                    )
+
+                    rows = []
+
+                    for _, row in heaviest_data.iterrows():
+                        weight_kg = row["prescribed_weight_kg"]
+
+                        if summary_unit == "lb":
+                            weight = weight_kg / 0.453592
+                        else:
+                            weight = weight_kg
+
+                        rows.append(
+                            f"- Week {int(row['week_num'])}, "
+                            f"Session {int(row['day_num'])}: "
+                            f"{weight:.1f} {summary_unit}"
+                        )
+
+                    formatted_rows = "\n".join(rows)
+
+                    exercise = heaviest_request["exercise"]
+
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": (
+                            f"**Heaviest {exercise} set**\n\n"
+                            f"{formatted_rows}"
+                        ),
+                    }
+        elif summary_request is not None:
+            if st.session_state.generated_program is None:
+                assistant_message = {
+                    "role": "assistant",
+                    "content": (
+                        "Generate a program first, then I can summarize "
+                        "a specific lift."
+                    ),
+                }
+
+            else:
+                lift_data = get_lift_summary(
+                    st.session_state.generated_program,
+                    summary_request["exercise"],
+                )
+
+                exercise = summary_request["exercise"]
+
+                summary_data = lift_data.copy()
+
+                extra_note = ""
+
+                if exercise == "squat":
+                    summary_data = summary_data[
+                        summary_data["week_num"] != 8
+                    ]
+
+                    extra_note = (
+                        "\n- Week 8 is a separate max-testing week "
+                        "and is excluded from these training totals"
+                    )
+
+                if exercise == "squat":
+                    summary_data = summary_data[
+                        summary_data["week_num"] != 8
+                    ]
+
+                if lift_data is None:
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": (
+                            "I could not find that lift in your "
+                            "generated program."
+                        ),
+                    }
+
+                else:
+                    num_weeks = int(summary_data["week_num"].nunique())
+
+                    num_sessions = int(
+                        summary_data[
+                            ["week_num", "day_num"]
+                        ].drop_duplicates().shape[0]
+                    )
+
+                    total_sets = int(summary_data["num_sets"].sum())
+
+                    min_weight_kg = summary_data[
+                        "prescribed_weight_kg"
+                    ].min()
+
+                    max_weight_kg = summary_data[
+                        "prescribed_weight_kg"
+                    ].max()
+
+                    summary_unit = (
+                        st.session_state.active_unit
+                        or st.session_state.pending_unit
+                        or unit
+                    )
+
+                    if summary_unit == "lb":
+                        min_weight = min_weight_kg / 0.453592
+                        max_weight = max_weight_kg / 0.453592
+                    else:
+                        min_weight = min_weight_kg
+                        max_weight = max_weight_kg
+
+                    exercise = summary_request["exercise"]
+
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": (
+                            f"**{exercise.title()} program summary**\n\n"
+                            f"- {num_weeks} weeks\n"
+                            f"- {num_sessions} sessions\n"
+                            f"- {total_sets} total working sets\n"
+                            f"- Prescribed weights range from "
+                            f"{min_weight:.1f} {summary_unit} to "
+                            f"{max_weight:.1f} {summary_unit}"
+                            f"{extra_note}"
+                        ),
+                    }
+        elif session_request is not None:
             if st.session_state.generated_program is None:
                 assistant_message = {
                     "role": "assistant",
@@ -434,12 +675,23 @@ if user_message:
                         }
 
         else:
-            try:
-                current_maxes = extract_maxes_with_groq(
-                    user_message
-                )
-            except Exception:
-                current_maxes = extract_maxes(user_message)
+            if not re.search(r"\d", user_message):
+                assistant_message = {
+                    "role": "assistant",
+                    "content": (
+                        "I’m not sure what program information you want. "
+                        "You can ask about a lift summary, a week, or a "
+                        "specific session."
+                    ),
+                }
+
+            else:
+                try:
+                    current_maxes = extract_maxes_with_groq(
+                        user_message
+                    )
+                except Exception:
+                    current_maxes = extract_maxes(user_message)
 
             if len(current_maxes) != 3:
                 raise ValueError(
